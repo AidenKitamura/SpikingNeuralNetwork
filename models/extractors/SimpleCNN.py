@@ -6,7 +6,8 @@ class SimpleCNN(nn.Module):
     This SimpleCNN backbone contains 6 layers,
     each of which uses a ReLU activation and a
     3*3 kernel. A max pooling of size 2*2 is 
-    applied after every 2 CNN layers
+    applied after every 2 CNN layers. A drop-
+    out layer is applied at the last layer
     
     Parameters:
     - in_channel: input data channels
@@ -48,6 +49,7 @@ class SimpleCNN(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(kernel_size = (2, 2)),
             nn.Flatten(),
+            nn.Dropout(p=0.9),
             nn.Linear(64 * self.output_size[0] * self.output_size[1],\
                 output_dim)
         )
