@@ -6,9 +6,11 @@ BIC Group Project - MNIST Predictor
 
 @author: Woo Jia Jun
 
-29/7 Update:
-- Quantization not implemented yet.
-- Weight pruning methodology not tested.
+30/7 0135 Update:
+- Added global variable flag to denote use of spiking CNN model
+- Normalisation implemented (potentially naive solution)
+- Quantization still to be done.
+
 """
 import torch
 import torchvision
@@ -22,10 +24,10 @@ import numpy as np
 # import modules from this project
 from MnistLoader import train_loader, test_loader
 from SimpleCNN import SimpleCNN
+from SpikingCNN import SpikingCNN
 
-net = SimpleCNN()  # initialise the CNN model
-# (29/7: requires flag or some other switching implementation
-# for using SNN model)
+activate_spiking = False  # if true, use spiking CNN model
+net = (SpikingCNN() if activate_spiking else SimpleCNN())  # initialise the CNN model
 n_epochs = 10  # number of training epochs
 batch_size_train = 64  # training set batch size
 batch_size_test = 1000  # testing set batch size
@@ -68,7 +70,14 @@ def train(epoch: int):
         optimizer.zero_grad()
         output = net(data)
         loss = F.nll_loss(output, target)
-        loss.backward()
+        # conduct loss normalisation
+        height = loss.size()[-2]
+        width = loss.size()[-1]
+        unnorm_loss = loss.view(loss.size(0), -1)
+        unnorm_loss -= unnorm_loss.min(1, keepdim=True)[0]
+        unnorm_loss /= unnorm_loss.max(1, keepdim=True)[0]
+        norm_loss = unnorm_loss.view(batch_size_train, height, width)
+        norm_loss.backward()
         optimizer.step()
         if batch_idx % log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
@@ -96,7 +105,16 @@ def test():
     with torch.no_grad():
         for data, target in test_loader:
             output = net(data)
-            test_loss += F.nll_loss(output, target, size_average=False).item()
+            loss = F.nll_loss(output, target, size_average=False)
+            # conduct loss normalisation (Note: loss here appears to be a
+            # scalar, unsure if methodology is correct)
+            height = loss.size()[-2]
+            width = loss.size()[-1]
+            unnorm_loss = loss.view(loss.size(0), -1)
+            unnorm_loss -= unnorm_loss.min(1, keepdim=True)[0]
+            unnorm_loss /= unnorm_loss.max(1, keepdim=True)[0]
+            norm_loss = unnorm_loss.view(batch_size_test, height, width)
+            test_loss += norm_loss.item()
             pred = output.data.max(1, keepdim=True)[1]
             correct += pred.eq(target.data.view_as(pred)).sum()
     test_loss /= len(test_loader.dataset)
