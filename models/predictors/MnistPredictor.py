@@ -39,6 +39,7 @@ torch.backends.cudnn.enabled = False
 torch.manual_seed(random_seed)
 
 # pruning-related variables
+activate_prune = False # if true, apply pruning during the train-test process
 online_prune = False  # if true, apply prune process during training process
 prune_method = "random"  # specify the method to determine weights to prune
 
@@ -136,7 +137,7 @@ criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=learning_rate, momentum=momentum)
 
 test()
-if online_prune:
+if (activate_prune and online_prune):
     # in the paper, the online prune method requires a short training set
     # of 30,000 images. The below train is a crude mimicry of this initial
     # training.
@@ -144,10 +145,10 @@ if online_prune:
 for epoch in range(1, n_epochs + 1):
     train(epoch)
     test()
-    if online_prune:
+    if (activate_prune and online_prune):
         # for online weight pruning,
         weight_prune(prune_method)
-if not(online_prune):
+if (activate_prune and not(online_prune)):
     # for post-training weight pruning, one pruning process is executed
     # after the whole training process.
     weight_prune(prune_method)
